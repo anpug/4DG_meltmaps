@@ -1,5 +1,5 @@
 # 4DGreenland melt maps validation 
-
+The repository contains the code used to validate melt maps from ASCAT scatterometer data using an ensemble of regional climate models (RCM) such as MARv3.12, RACMO3.2, HIRHAM5 and CARRA. 
 
 
 ## Files
