@@ -11,6 +11,18 @@ import numpy as np
 import pyproj 
 from scipy.interpolate import griddata
 
+
+def transform_coords(lon, lat): 
+    transformer = pyproj.Transformer.from_crs('EPSG:4326','EPSG:3413')  
+    polar_lon,polar_lat = transformer.transform(lat,lon)
+    return polar_lon, polar_lat
+
+def _preprocess(RCM):
+    RCM.coords['lon_2'] = (RCM.coords['lon_2'] + 180) % 360 - 180
+    return RCM
+    
+    return RCM 
+
 def load_RCM(home_dir, RCM_name, year, season = None): 
     '''
     Function that loads in RCM from one netcdf-file 
@@ -64,13 +76,28 @@ def load_RCM(home_dir, RCM_name, year, season = None):
         lon = RCM.lon.data 
         lat = RCM.lat.data 
         
-        # Transform into EPSG 3413 using pyproj:
-        transformer = pyproj.Transformer.from_crs('EPSG:4326','EPSG:3413')  
-        polar_lon,polar_lat = transformer.transform(lat,lon)
+        # Trnasform coordinates to polar stereografic: 
+        polar_lon,polar_lat = transform_coords(lon, lat)
+        
+    elif RCM_name == 'CARRA': 
+        RCM = xr.open_mfdataset(home_dir + f'/CARRA/Daily2D_{year}*.nc', 
+                                concat_dim = 'time' , 
+                                combine = 'nested', 
+                                preprocess=_preprocess, 
+                                parallel = True, 
+                                data_vars = ['snmel'])
+        
+        # For some reason they are called lon_2 and lat_2:
+        lon = RCM.lon_2.data 
+        lat = RCM.lat_2.data 
+
+        # Trnasform coordinates to polar stereografic: 
+        polar_lon,polar_lat = transform_coords(lon, lat)
+        melt_data = np.array(RCM.snmel)
         
     return polar_lat, polar_lon, melt_data
 
-def load_yearly_RCM(RCM_name, year): 
+def load_yearly_RCM(home_dir,RCM_name, year): 
     
     '''
     Function that loads a specific year of the RCM. Since RACMO are devided into seasonal files each file 
@@ -85,15 +112,15 @@ def load_yearly_RCM(RCM_name, year):
     '''   
     if RCM_name == 'RACMO': # Only for RACMO since files are too big to be loaded in at once.
         # Now we import a year and one RCM for the full year: (always on the same grid no matter the season)
-        polar_lat, polar_lon, melt_dataJFM = load_RCM(RCM_name, year, season = 'JFM')
-        _, _, melt_dataAMJ = load_RCM(RCM_name, year, season = 'AMJ')
-        _, _, melt_dataJAS = load_RCM(RCM_name, year, season = 'JAS')
-        _, _, melt_dataOND = load_RCM(RCM_name, year, season = 'OND')
+        polar_lat, polar_lon, melt_dataJFM = load_RCM(home_dir,RCM_name, year, season = 'JFM')
+        _, _, melt_dataAMJ = load_RCM(home_dir,RCM_name, year, season = 'AMJ')
+        _, _, melt_dataJAS = load_RCM(home_dir,RCM_name, year, season = 'JAS')
+        _, _, melt_dataOND = load_RCM(home_dir,RCM_name, year, season = 'OND')
         
         # Combine into one full year:
         melt_data = np.vstack((melt_dataJFM, melt_dataAMJ, melt_dataJAS, melt_dataOND))
     else: # All other RCMs:
-        polar_lat, polar_lon, melt_data = load_RCM(RCM_name, year)
+        polar_lat, polar_lon, melt_data = load_RCM(home_dir,RCM_name, year)
         
     return polar_lat, polar_lon, melt_data
 
