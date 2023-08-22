@@ -13,18 +13,10 @@ The repository contains the code used to validate melt maps from ASCAT scatterom
 
 ## Folders
 
-### `contributors`
-Each member of our team has a folder within the repository to conduct their work to prevent conflict with merging with the main branch.
-* `Anna`
-* `Bryony`
-* `Maria`
-* `Danni `
-
 ### `notebooks`
-Notebook containing ongoing results from the project.
+Notebook containing ongoing results from the validation. 
 
 ### `scripts`
 Python scripts containing developed functions used to analyze ICESat-2 tracks. 
-* `haversine.py`
-* `gzfeatureextract.py`
+* `regridding_tools.py` Helper functions to load RCM (.nc files) and regrid to ASCAT grid in a North Polar Stereographic projection (EPSG:3431). 
 
