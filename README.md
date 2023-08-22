@@ -17,6 +17,7 @@ The repository contains the code used to validate melt maps from ASCAT scatterom
 Notebook containing ongoing results from the validation. 
 
 ### `scripts`
-Python scripts containing developed functions used to analyze ICESat-2 tracks. 
-* `regridding_tools.py` Helper functions to load RCM (.nc files) and regrid to ASCAT grid in a North Polar Stereographic projection (EPSG:3431). 
+Python scripts containing developed functions used to import data and analyze ASCAT melt maps. 
+* `load_data.py` Helper functions to load RCM (.nc files) and ASCAT files (.geotif files).
+* `helper_tools.py` Used for computing number of melt days and melt season for both ASCAT melt maps and RCM. 
 
