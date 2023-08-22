@@ -9,19 +9,18 @@ Created on Fri Aug 18 15:02:31 2023
 import xarray as xr
 import numpy as np
 import pyproj 
-from scipy.interpolate import griddata
+from osgeo import gdal
+import pickle
 
+def preprocess_func(RCM):
+    RCM.coords['lon_2'] = (RCM.coords['lon_2'] + 180) % 360 - 180
+    return RCM
 
-def transform_coords(lon, lat): 
+def tranform_coord(lon, lat): 
     transformer = pyproj.Transformer.from_crs('EPSG:4326','EPSG:3413')  
     polar_lon,polar_lat = transformer.transform(lat,lon)
     return polar_lon, polar_lat
 
-def _preprocess(RCM):
-    RCM.coords['lon_2'] = (RCM.coords['lon_2'] + 180) % 360 - 180
-    return RCM
-    
-    return RCM 
 
 def load_RCM(home_dir, RCM_name, year, season = None): 
     '''
@@ -76,28 +75,26 @@ def load_RCM(home_dir, RCM_name, year, season = None):
         lon = RCM.lon.data 
         lat = RCM.lat.data 
         
-        # Trnasform coordinates to polar stereografic: 
-        polar_lon,polar_lat = transform_coords(lon, lat)
-        
+        # Transform into EPSG 3413 using pyproj: 
+        polar_lon,polar_lat = tranform_coord(lon, lat)
+
     elif RCM_name == 'CARRA': 
+        # Load in a full year of CARRA data using with lon from -180,180 degrees: 
         RCM = xr.open_mfdataset(home_dir + f'/CARRA/Daily2D_{year}*.nc', 
-                                concat_dim = 'time' , 
-                                combine = 'nested', 
-                                preprocess=_preprocess, 
-                                parallel = True, 
-                                data_vars = ['snmel'])
-        
-        # For some reason they are called lon_2 and lat_2:
+                                concat_dim = 'time' , combine = 'nested', 
+                                preprocess=preprocess_func, parallel = True, data_vars = ['snmel'])
+
+        # Extract lon og lat and reproject to North Polar Stereographic (EPSG:3431)
         lon = RCM.lon_2.data 
         lat = RCM.lat_2.data 
+        polar_lon,polar_lat = tranform_coord(lon, lat)
 
-        # Trnasform coordinates to polar stereografic: 
-        polar_lon,polar_lat = transform_coords(lon, lat)
-        melt_data = np.array(RCM.snmel)
+        # Convert melt data to array: 
+        melt_data = np.array(RCM.snmel.data)
         
     return polar_lat, polar_lon, melt_data
 
-def load_yearly_RCM(home_dir,RCM_name, year): 
+def load_yearly_RCM(RCM_name, year): 
     
     '''
     Function that loads a specific year of the RCM. Since RACMO are devided into seasonal files each file 
@@ -112,33 +109,60 @@ def load_yearly_RCM(home_dir,RCM_name, year):
     '''   
     if RCM_name == 'RACMO': # Only for RACMO since files are too big to be loaded in at once.
         # Now we import a year and one RCM for the full year: (always on the same grid no matter the season)
-        polar_lat, polar_lon, melt_dataJFM = load_RCM(home_dir,RCM_name, year, season = 'JFM')
-        _, _, melt_dataAMJ = load_RCM(home_dir,RCM_name, year, season = 'AMJ')
-        _, _, melt_dataJAS = load_RCM(home_dir,RCM_name, year, season = 'JAS')
-        _, _, melt_dataOND = load_RCM(home_dir,RCM_name, year, season = 'OND')
+        polar_lat, polar_lon, melt_dataJFM = load_RCM(RCM_name, year, season = 'JFM')
+        _, _, melt_dataAMJ = load_RCM(RCM_name, year, season = 'AMJ')
+        _, _, melt_dataJAS = load_RCM(RCM_name, year, season = 'JAS')
+        _, _, melt_dataOND = load_RCM(RCM_name, year, season = 'OND')
         
         # Combine into one full year:
         melt_data = np.vstack((melt_dataJFM, melt_dataAMJ, melt_dataJAS, melt_dataOND))
     else: # All other RCMs:
-        polar_lat, polar_lon, melt_data = load_RCM(home_dir,RCM_name, year)
+        polar_lat, polar_lon, melt_data = load_RCM(RCM_name, year)
         
     return polar_lat, polar_lon, melt_data
 
+def open_pickle(file_path): 
+    f = open(file_path, 'rb')
+    return pickle.load(f)
 
-def grid_data(lat_ori, lon_ori, var_ori, ref_lat, ref_lon, method_name):
-    
-    '''
-    Function used to interpolate/regrid melt data to the ASCAT grid (in this case). Important that the original 
-    grid and new grid is in the same projection (in this case EPSG:3413)
-    
-    Input: lat_ori, lon_ori: coordinates of the original grid (2D arrays)
-           var_ori: Data to be regridded on the original grid (2D arrays).
-           ref_lon, ref_lat: 
-           method: 
-    
-    Output: (melt)Data on the new grid. 
-    '''
-   
-    grid_var = griddata((lon_ori.flatten(), lat_ori.flatten()), var_ori.flatten(), (ref_lon, ref_lat), method=method_name)
+def read_tif(file_path):
+    tif = gdal.Open(file_path)
+    band= tif.GetRasterBand(1)
+    arr = band.ReadAsArray().astype(np.float64)
+    arr[arr == 65535] = np.nan
+    return arr 
 
-    return grid_var
+def write_geotiff(filename, arr, in_ds):
+    if arr.dtype == np.float32:
+        arr_type = gdal.GDT_Float32
+    else:
+        arr_type = gdal.GDT_Int32
+
+    driver = gdal.GetDriverByName("GTiff")
+    out_ds = driver.Create(filename, arr.shape[1], arr.shape[0], 1, arr_type)
+    out_ds.SetProjection(in_ds.GetProjection())
+    out_ds.SetGeoTransform(in_ds.GetGeoTransform())
+    band = out_ds.GetRasterBand(1)
+    band.WriteArray(arr)
+    band.FlushCache()
+    band.ComputeStatistics(False)
+
+
+def icemask_from_tif(file_path):
+    '''
+    Opens a meltmap (geotif-file) and convert it into a ice mask. Since the extent of the meltmaps are always 
+    the same a random melt scene can be used to generate the icemask. Bedrock and ocean are set to np.nan whereas 
+    ice is set to 1. 
+    
+    Input: file_path: Path to meltmap
+    Output: icemask: a mask consising of either 1 or nan. 
+    '''
+    
+    icemask = read_tif(file_path)
+    # Ocean and bedrock is set to nan. 
+    icemask[icemask >= 5] = np.nan
+    # Different classes of melt is set to 1 
+    icemask[icemask <= 4] = 1
+    return icemask 
+
+
