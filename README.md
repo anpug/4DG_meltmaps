@@ -15,7 +15,10 @@ The repository contains the code used to validate melt maps from ASCAT scatterom
 
 ### `notebooks`
 Notebook containing ongoing results from regridding RCM to the ASCAT grid and ASCAT validation against the RCM. 
-* `regrid_RCM.ipynb` loads annual RCM data and regrids the data to the ASCAT grid. All RCM are reprojected to the North Polar Stereograpc (EPSG:3431) before regridding. Since the regridded RCM are on the same grid as ASCAT, data is stored as a pickle file without grid information to save storage.  
+* `regrid_RCM.ipynb` loads annual RCM data and regrids the data to the ASCAT grid. All RCM are reprojected to the North Polar Stereograpc (EPSG:3431) before regridding. Since the regridded RCM are on the same grid as ASCAT, data is stored as a pickle file without grid information to save storage.
+* `validation_RCM_ASCAT.ipynb`
+* `validation_drainage_basins.ipynb`
+* `backscatter_profiles.ipynb`
 
 ### `scripts`
 Python scripts containing developed functions used to import data and analyze ASCAT melt maps. 
