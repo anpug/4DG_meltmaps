@@ -1,6 +1,5 @@
 # 4DGreenland melt maps validation 
-The repository contains the code used to validate melt maps from ASCAT scatterometer data using an ensemble of regional climate models (RCM) such as MARv3.12, RACMO3.2, HIRHAM5 and CARRA. 
-
+This repository provides the material used for the preprint: **Bias in modeled Greenland ice sheet melt revealed by ASCAT**	(https://doi.org/10.5194/egusphere-2024-1108). The repository contains the code used to compare melt extent derived from ASCAT melp maps and an ensemble of regional climate models (RCM), MARv3.12, RACMO3.2, and HIRHAM5.
 
 ## Files
 
